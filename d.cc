@@ -10,6 +10,7 @@
 #include <string>
 #include <utility>
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 #include <unordered_map>
 #include <type_traits>
@@ -214,6 +215,32 @@ void do_set(C<char const *> const& ids, char const* tailp, D_level d) {
 
 }
 
+// Streambuf emulating /dev/null.
+template <typename CT, typename TT = std::char_traits<CT>>
+class devnull_streambuf : public std::basic_streambuf<CT, TT> {
+protected:
+	typename std::basic_streambuf<CT,TT>::int_type
+	overflow(typename std::basic_streambuf<CT,TT>::int_type c = TT::eof());
+};
+
+template <typename CT, typename TT>
+typename std::basic_streambuf<CT,TT>::int_type
+devnull_streambuf<CT,TT>::overflow(typename std::basic_streambuf<CT,TT>::int_type)
+{
+	this->setp(this->pbase(), this->epptr());
+	return TT::to_int_type(0);
+}
+
+std::unique_ptr<std::ofstream> f_ptr;
+std::unique_ptr<devnull_streambuf<char>> ign_sb;
+std::unique_ptr<std::ostream> ign_fp;
+std::ostream* cur_ofp { nullptr };
+D_flag_type flags { D_flag_type() };
+int ofp_delaybit { 0 };
+
+inline bool ofp_is_file() {
+	return cur_ofp == f_ptr.get();
+}
 }
 
 void D_set(D_context const& d) {
@@ -252,7 +279,7 @@ void D_set_from_string(std::string const& str) {
 			// scope of key part needs to be pulled up so iterators used by boost::tokenizer are valid
 			auto key = param.substr(0, kv_pos);
 			boost::tokenizer<decltype(i_sep)> ids(key, i_sep);
-			for (auto const& id : ids) 
+			for (auto const& id : ids)
 				scopes.push_back(std::string(id));
 		}
 		std::vector<char const*> sp;
@@ -295,3 +322,64 @@ std::ostream& operator<< (std::ostream& out, D_level const lv) {
 std::ostream& operator<< (std::ostream& out, D_context const& d) {
 	return out << d.level << ' ' << *d.id;
 }
+
+void D_set_file(std::string const& f) {
+	if ((ofp_delaybit > 0) && ofp_is_file() && (flags & D_flag_ofp_throw))
+		throw std::invalid_argument("File change while delay bit set and file is current ofp");
+	if (f_ptr)
+		f_ptr->close();
+	f_ptr.reset(new std::ofstream(f));
+}
+
+void D_unset_file() {
+	if ((ofp_delaybit > 0) && ofp_is_file() && (flags & D_flag_ofp_throw))
+		throw std::invalid_argument("File change while delay bit set and file is current ofp");
+	if (f_ptr)
+		f_ptr->close();
+	f_ptr.reset(nullptr);
+}
+
+void D_set_xparam(D_flag_type f) {
+	flags = f;
+}
+
+std::ostream* D_ofp() {
+	if (ofp_delaybit > 0)
+		return cur_ofp;
+	std::ostream* next_fp (nullptr);
+	if (flags & D_flag_lib) {
+		if (f_ptr) {
+			next_fp = f_ptr.get();
+		} else {
+			if (flags & D_flag_lib_throw)
+				throw std::invalid_argument("Lib mode and missing file");
+			else
+				next_fp = D_ofp_ignore();
+		}
+	} else {
+		if (f_ptr)
+			next_fp = f_ptr.get();
+		else
+			next_fp = &std::cerr;
+	}
+
+	return (cur_ofp = next_fp);
+}
+
+std::ostream* D_ofp_ignore() {
+	if (!ign_fp) {
+		ign_sb.reset(new devnull_streambuf<char>);
+		ign_fp.reset(new std::ostream(ign_sb.get()));
+	}
+	return ign_fp.get();
+}
+
+
+void D_delay_ofp() {
+	++ofp_delaybit;
+}
+
+void D_undelay_ofp() {
+	--ofp_delaybit;
+}
+

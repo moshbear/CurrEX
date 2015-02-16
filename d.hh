@@ -149,6 +149,54 @@ void D_set_from_string(std::string const&);
 // Arg: char const* d_str - option such that next element in argv is the string to parse
 // Throw: std::invalid_argument if d_str is the last (non-null) element in argv
 void D_set_from_args(int argc, char const* const* argv, char const* d_str);
+// void D_set_file(std::string const&).
+// Enable logging output to a file.
+// If existing file is set, it is closed.
+//
+// Arg: std::string const& - file name
+void D_set_file(std::string const&);
+// void D_unset_file().
+// Disable logging output to a file.
+void D_unset_file();
+// D_flag_* - Flags for setting extended params
+// Flag type.
+typedef unsigned D_flag_type;
+// Set when in library mode - logging to console becomes disabled
+static const D_flag_type D_flag_lib = 1<<0;
+// Set when to throw instead of ignore attempts to log to console (i.e. no set file) when in lib mode
+static const D_flag_type D_flag_lib_throw = 1<<1;
+// Set when to throw if delaybit is set, and active ofp is file, and D_{un,}set_file is called
+static const D_flag_type D_flag_ofp_throw = 1<<2;
+// void D_set_xparam(D_flag_type)
+// Set extended params as needed.
+//
+// D_flag_type - Parameter flagset
+void D_set_xparam(D_flag_type);
+
+// std::ostream* D_ofp()
+// Get current output file stream ptr.
+std::ostream* D_ofp();
+// std::ostream* D_ofp_ignore()
+// Get the specified ignore device.
+std::ostream* D_ofp_ignore();
+// void D_delay_ofp().
+// void D_undelay_ofp().
+//
+// Mark or clear delaying of modification of output file stream ptr,
+// eg if the value is cached in a function.
+void D_delay_ofp();
+void D_undelay_ofp();
+
+// Delay proxy type. By placing delay and undelay into ctor/dtor,
+// delay is now exception-safe.
+struct D_delay {
+	D_delay() {
+		D_delay_ofp();
+	}
+	~D_delay() {
+		D_undelay_ofp();
+	}
+};
 
 // Macros.
 // The following are defined for external code:
@@ -157,10 +205,12 @@ void D_set_from_args(int argc, char const* const* argv, char const* d_str);
 // 	D_cprint(L, o, s) - as above, but a copy is made of the string argument for scoping reasons
 // 	D_push_id(ID) - bring the most-local D_identifier with local part ID into scope
 // 	D_add_context(D_l) - add an identifier context to D_l; uses most local D_identifier
+// 	D_out - current output stream
 // Defining NDEBUG converts these into empty statements.
 // Anything in D_X_* is unsupported when used externally.
-#define D_X_CAT3X(X,Y,Z) X##Y##Z
-#define D_X_CAT3(X,Y,Z) D_X_CAT3X(X,Y,Z)
+#define D_X_CATX(X,Y) X##Y
+#define D_X_CAT(X,Y) D_X_CATX(X,Y)
+#define D_X_CAT3(X,Y,Z) D_X_CAT(X,D_X_CATX(Y,Z))
 #ifndef NDEBUG
 #define D_eval(L, ...) if (D_ok(D_add_context(L))) do { __VA_ARGS__; } while(0)
 #define D_print(L, o, s) if (D_ok(D_add_context(L))) do { D_xprint(D_add_context(L), o, s); } while(0)
@@ -170,12 +220,16 @@ void D_set_from_args(int argc, char const* const* argv, char const* d_str);
 	static constexpr D_id_list const* D_X_CAT3(SAVE,ID,__LINE__) = &D_identifier; \
 	static constexpr D_id_list D_identifier(#ID, D_X_CAT3(SAVE,ID,__LINE__))
 #define D_add_context(D_level) D_context{ D_identifier, D_level }
+#define D_out (*D_ofp())
+#define D_DELAY D_delay D_X_CAT(DELAY,__LINE__)
 #else
 #define D_eval(...)
 #define D_print(...)
 #define D_cprint(...)
 #define D_push_id(...)
 #define D_add_context(...)
+#define D_out (*D_ofp_ignore())
+#define D_DELAY
 #endif
 
 #endif
