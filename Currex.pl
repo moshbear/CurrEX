@@ -76,10 +76,22 @@ sub get_best_path {
 	return $path;
 }
 
+sub labelize {
+	my $arr = shift or die "missing index array";
+	my $lab = shift or die "missing label array";
+	my $lab_size = $#{ $lab };
+	return
+		map {
+			die "bad label index: $_" if ($_ > $lab_size);
+			$$lab[$_];
+		} (@$arr);
+}
+	
+
 Currex_backend::D_set_xparam($Currex_backend::D_flag_lib 
 				| $Currex_backend::D_flag_lib_throw
 				| $Currex_backend::D_flag_ofp_throw);
-Currex_backend::D_set_from_string("t");
+Currex_backend::D_set_from_string("i");
 
 Currex_backend::D_set_file("backend.d-log");
 
@@ -94,8 +106,16 @@ my $vtx_labels = Currex_backend::Labeled_graph_labels($lg);
 my $best_path = $xpath->get_path();
 my $best_rate = $xpath->{lrate};
 
-my @labeled_path = @$best_path;
-map { $_ = $$vtx_labels[$_]; } (@labeled_path);
-print "path: ".join("->", @labeled_path)." rate: ".(1/exp($best_rate));
-Currex_backend::delete_Labeled_graph($lg);
+print "path: [", $#{ $best_path }, "] ",
+		join("->", labelize($best_path, $vtx_labels)),
+	" lrate: ",
+		$best_rate,
+		" (", exp(-$best_rate), "x profit)",
+	"\n";
+
+END {
+	if (defined($lg)) {
+		Currex_backend::delete_Labeled_graph($lg);
+	}
+}
 
