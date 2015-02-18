@@ -78,9 +78,9 @@ int main(int argc, char** argv) {
 	auto const& P (op.path);
 	if (P.size() == bgl::num_vertices(lg.graph))
 		D_print(D_info, std::cerr, "Hamiltonian.");
+	bool p_once = true;
 	for (auto const& p : P)
-		std::cout << lg.labels[p] << ";";
-	std::cout << lg.labels[P[0]];
+		std::cout << lg.labels[p] << ((p != P[0] || p_once) ? ((p_once = false), ";") : "");
 	std::cout << ' ' << op.lrate << std::endl;
 }
 

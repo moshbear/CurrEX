@@ -237,6 +237,8 @@ namespace graph {
 	// Compute the best path, subject to an optional specified iteration limit.
 	//	0th iteration searches for initial 3-cycle and successive iterations build iteratively from that.
 	//
+	// Note: returns a closed path
+	//
 	// (TArg): G - Graph type
 	// Arg: labeled::Graph<G> const& lg_in - input graph
 	// Arg: size_t max_iterations - maximum iteration count
@@ -287,6 +289,8 @@ namespace graph {
 				break;
 			}
 		}
+
+		rp_out.path = g_common::close_path<G>(rp_out.path);
 		return rp_out;
 	}
 
