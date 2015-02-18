@@ -17,8 +17,10 @@ our $instruments_url = 'http://api-sandbox.oanda.com/v1/instruments';
 our $rates_url = 'http://api-sandbox.oanda.com/v1/prices?instruments=';
 
 sub fetch_http {
-	my $url = shift;
+	my $_sub = ((caller(0)))[3];
 	my $_psub = ((caller(1)))[3];
+	my $url = shift;
+	die "$_sub: missing url" if !(ref($url) eq '');
 	my $ua = LWP::UserAgent->new();
 	my $response = $ua->get($url);
 	die "$_psub [GET $url]:".$response->status_line if !$response->is_success;
@@ -34,13 +36,15 @@ sub get_instruments {
 }
 
 sub prune_vertices {
-	my $instruments = shift;
+	my $_sub = ((caller(0)))[3];
+	my $instruments = shift or die "$_sub: missing instruments input";
 	return Currex_backend::prune_vertices($instruments);
 }
 
 sub get_rates {
 	my $_sub = ((caller(0)))[3];
 	my $instruments = shift;
+	die "$_sub: input not ref to list of instruments" if !(ref($instruments) eq 'ARRAY');
 	my $json = fetch_http($rates_url.join("%2C", @$instruments));
 	## Fancy quasi-qson rates file structured for minimal parsing effort
 	# split by object and array delimiters to get instrument blobs
@@ -63,14 +67,16 @@ sub get_rates {
 }
 
 sub load_graph {
-	my $rates = shift;
+	my $_sub = ((caller(0)))[3];
+	my $rates = shift or die "$_sub: missing rates";
 	my $lg = shift // Currex_backend::new_Labeled_graph();
 	my $_discard_modified = Currex_backend::load_graph_from_rates($lg, $rates);
 	return $lg;
 }
 
 sub get_best_path {
-	my $lg = shift;
+	my $_sub = ((caller(0)))[3];
+	my $lg = shift or die "$_sub: missing lg handle";
 	my $max_iterations = shift // -1;
 	my $path = Currex_backend::best_path($lg, $max_iterations);
 	return $path;
