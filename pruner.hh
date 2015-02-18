@@ -16,6 +16,6 @@
 // Prune a graph described by an edge list in input and return the
 // pruned graph's edge list as output.
 // Graph is assumed to be undirected.
-std::vector<std::string> pruner(std::vector<std::string> const& in);
+std::vector<std::string> prune_vertices(std::vector<std::string> const& in);
 
 #endif

@@ -19,6 +19,7 @@
 #include <c-print.hh>
 #include <util.hh>
 #include <g-common.hh>
+#include <g-rategraph.hh>
 
 namespace labeled {
 
@@ -51,7 +52,7 @@ namespace labeled {
 	template <typename Vertex>
 	struct Edge_t : public Node
 	{
-		std::array<Vertex, 2> edge;
+		std::vector<Vertex> edge;
 	};
 	template <typename VT>
 	std::ostream& operator<< (std::ostream& os, Vertex_t<VT> const& v) 
@@ -84,10 +85,10 @@ namespace labeled {
 	//
 	// (TArg): VT - Vertex type
 	// Arg: Node const& node - the base Node which captured the label vector
-	// Arg: std::array<VT, 2> const& e - the edge to label
+	// Arg: std::vector<VT> const& e - the edge to label
 	// Ret: a Vertex_T<VT> containing the deferred labeling of this edge
 	template <typename VT>
-	Edge_t<VT> edge(Node const& node, std::array<VT, 2> const& e)
+	Edge_t<VT> edge(Node const& node, std::vector<VT> const& e)
 	{
 		Edge_t<VT> le;
 		static_cast<Node&>(le) = node;
@@ -117,7 +118,7 @@ namespace labeled {
 	}
 	// std::vector<Edge_t<T>>
 	// 	labelify_edges<T>
-	// 	(std::vector<std::array<T, 2>> const&, std::vector<std::string> const&).
+	// 	(std::vector<std::vector<T>> const&, std::vector<std::string> const&).
 	// Labelify a set of vertices given a label vector by capturing the label vector and performing 
 	// a foreach over v with function vertex().
 	//
@@ -127,7 +128,7 @@ namespace labeled {
 	// Ret: a vector of Edge_t<T>'s, with lazily evaluated labeling.
 	template <typename T>
 	std::vector<Edge_t<T>>
-	labelify_edges(std::vector<std::array<T, 2>> const& e, std::vector<std::string> const& l)
+	labelify_edges(std::vector<std::vector<T>> const& e, std::vector<std::string> const& l)
 	{
 		Node ln{ std::cref(l) };
 		std::vector<Edge_t<T>> out;
@@ -136,47 +137,49 @@ namespace labeled {
 		return out;
 	}
 
-	// Graph<G>.
-	// A labeled graph, where a graph is coupled with a vector of labels describing the vertices.
-	//
-	// Printing via ostream yields a tuple print of c_print printers, with "vertices" and "edges"
-	// prefixes occurring before the enumeration of the labeled vertices and edges.
-	//
-	// TArg: G - Graph type
-	template <typename G>
-	struct Graph
-	{
-		// the graph
-		G graph;
-		// the label vector
-		std::vector<std::string> labels;
-
-		Graph() = default;
-
-		template <typename G_, typename L_>
-		Graph(G_&& g, L_&& l)
-		: graph(std::forward<G_>(g)), labels(std::forward<L_>(l))
-		{ }
-	};
-	template <typename CT, typename TT, typename G>
-	std::basic_ostream<CT,TT>& operator<< (std::basic_ostream<CT,TT>& os, Graph<G> const& lg)
-	{
-		typedef typename g_common::VE<G>::Vertex Vertex;
-		typedef std::array<Vertex,2> Edge;
-		std::vector<Vertex> vertices;
-		std::vector<Edge> edges;
-		G const& graph (lg.graph);
-		std::vector<std::string> const& labels (lg.labels);
-		for (Vertex u = 0; u < bgl::num_vertices(graph); ++u)
-			vertices.push_back(u);
-		for (auto const& e : util::pair_to_range(bgl::edges(graph)))
-			edges.push_back(std::array<Vertex,2>{{ bgl::source(e, graph), bgl::target(e, graph) }});
-		os << std::make_tuple(c_print::printer(labelify_vertices(vertices, labels), "vertices"),
-					c_print::printer(labelify_edges(edges, labels), "edges"));
-		return os;
-
-	}
 
 }
+// Labeled_graph.
+// A labeled graph, where a graph is coupled with a vector of labels describing the vertices.
+//
+// Printing via ostream yields a tuple print of c_print printers, with "vertices" and "edges"
+// prefixes occurring before the enumeration of the labeled vertices and edges.
+//
+struct Labeled_graph {
+	// the graph
+	g_rategraph::Graph graph;
+	// the label vector
+	std::vector<std::string> labels;
+	
+	Labeled_graph() = default;
+	template <typename G_, typename L_>
+	Labeled_graph(G_&& g, L_&& l)
+	: graph(std::forward<G_>(g)), labels(std::forward<L_>(l))
+	{ }
+};
+
+template <typename CT, typename TT>
+std::basic_ostream<CT,TT>& operator<< (std::basic_ostream<CT,TT>& os, Labeled_graph const& lg)
+{
+	typedef typename g_rategraph::VE::Vertex Vertex;
+	typedef std::vector<Vertex> Edge;
+	std::vector<Vertex> vertices;
+	std::vector<Edge> edges;
+	auto const& graph (lg.graph);
+	std::vector<std::string> const& labels (lg.labels);
+	for (Vertex u = 0; u < bgl::num_vertices(graph); ++u)
+		vertices.push_back(u);
+	for (auto const& e : util::pair_to_range(bgl::edges(graph)))
+		edges.push_back(std::vector<Vertex>{{ bgl::source(e, graph), bgl::target(e, graph) }});
+	os << std::make_tuple(c_print::printer(labeled::labelify_vertices(vertices, labels), "vertices"),
+				c_print::printer(labeled::labelify_edges(edges, labels), "edges"));
+	return os;
+
+}
+
+Labeled_graph* new_Labeled_graph();
+void delete_Labeled_graph(Labeled_graph*);
+void Labeled_graph_filedump(Labeled_graph const&, std::string const&);
+std::vector<std::string> Labeled_graph_labels(Labeled_graph const&);
 
 #endif

@@ -3,7 +3,7 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 //
-// Get structured rates given a list of instruments.
+// Container for structured rates.
 //
 #ifndef RATES_HH
 #define RATES_HH
@@ -14,9 +14,6 @@
 #include <ostream>
 #include <ext/prettyprint.hpp>
 
-namespace rates {
-
-// A structured form of a Rate for an Instrument
 struct Rate {
 	// instrument name
 	std::string instrument;
@@ -39,13 +36,5 @@ std::basic_ostream<CT,TT>& operator<< (std::basic_ostream<CT,TT>& os, Rate const
 	return os;
 }
 
-// std::vector<Rate> get(std::vector<std::string> const&).
-// Get a list of rates in response to a list of instruments.
-//
-// Arg: std::vector<std::string> const& instruments - the list of instruments
-// Ret: std::vector<Rate> - the corresponding list of rates
-std::vector<Rate> get(std::vector<std::string> const& instruments);
-
-}
 
 #endif

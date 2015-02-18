@@ -23,7 +23,7 @@ endif #ifndef SAN
 	XSAN = -fsanitize=
 endif #ifndef NOSAN
 	_CC_ = clang
-	_CXX_ = clang++ $(XSAN)$(SAN)
+	_CXX_ = clang++ # $(XSAN)$(SAN)
 endif #ifdef CLANG
 
 ifdef GCC
@@ -55,17 +55,12 @@ endif
 ifndef CFLAGS_G
 	CFLAGS_G = -pipe -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic \
 		-Wno-padded -Wno-global-constructors -Wno-exit-time-destructors \
+		-Wno-missing-prototypes \
 		-I.
 endif
 
-ifdef D
-ifndef CFLAGS_D
-	CFLAGS_D = -O0 -g -ggdb
-endif
-else
 ifndef CFLAGS_D
 	CFLAGS_D = -O2 -g -ggdb
-endif
 endif
 
 ifndef LDFLAGS
@@ -84,54 +79,54 @@ ifndef CXXFLAGS
 	CXXFLAGS = $(CFLAGS)
 endif
 
+ifndef PERL5_CORE
+	PERL5_CORE =  $(shell dirname $(shell find /usr/lib/perl* -name 'libperl.so'))
+endif
+
+ifndef NOLIB
+	L = -fPIC
+endif
+
+SWIG_WIGNORE_CLANG = -Wno-old-style-cast -Wno-sign-conversion -Wno-gnu-statement-expression \
+		     -Wno-cast-align -Wno-implicit-fallthrough -Wno-missing-noreturn \
+		     -Wno-shorten-64-to-32 -Wno-conversion -Wno-sign-compare \
+		     -Wno-covered-switch-default -Wno-unused-macros -Wno-unused-parameter \
+		     -Wno-unused-variable -Wno-used-but-marked-unused \
+		     -Wno-unreachable-code-return
+
+SWIG_WIGNORE = $(SWIG_WIGNORE_CLANG)
+
 LDFLAGS_pruner =
-LDFLAGS_json = -ljson-c
 LDFLAGS_http = -lboost_system -lpthread
-LDFLAGS_rates = $(LDFLAGS_json) $(LDFLAGS_http)
-LDFLAGS_instr_ls = $(LDFLAGS_json) $(LDFLAGS_http)
 
 .PHONY: all clean
 
-all: run-instr-ls run-pruner run-rates run-graph run-eval main
+all: Currex_backend.so
 
-main: d.o http.o instr-ls.o pruner.o rates.o graph.o labeled.o c-print.o eval.cc
-	$(CXX11) $(CXXFLAGS) $(LDFLAGS) $(LDFLAGS_instr_ls) $(LDFLAGS_pruner) $(LDFLAGS_rates) -o $@ $^
+Currex_backend.so: Currex_backend_wrap.o c-print.o d.o graph.o g-rategraph.o labeled.o pruner.o 
+	$(CXX11) $(L) $(LD_SAN) $(LDFLAGS) -shared $^ -o $@
 
-run-eval: d.o run-eval.cc
-	$(CXX11) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
+Currex_backend_wrap.o: Currex_backend_wrap.cxx
+	sed 's/#include <algorithm>/#undef seed\n&/' -i $<
+	$(CXX11) $(L) $(CXXFLAGS) -c -o $@ $< -I$(PERL5_CORE) $(SWIG_WIGNORE)
 
-run-graph: d.o labeled.o c-print.o graph.o run-graph.cc
-	$(CXX11) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
-
-run-instr-ls: http.o instr-ls.o run-instr-ls.cc
-	$(CXX11) $(CXXFLAGS) $(LDFLAGS) $(LDFLAGS_instr_ls) -o $@ $^
-
-run-pruner: d.o c-print.o pruner.o run-pruner.cc
-	$(CXX11) $(CXXFLAGS) $(LDFLAGS) $(LDFLAGS_pruner) -o $@ $^
-
-run-rates: http.o rates.o run-rates.cc 
-	$(CXX11) $(CXXFLAGS) $(LDFLAGS) $(LDFLAGS_rates) -o $@ $^
-
-instr-ls.o: instr-ls.cc instr-ls.hh http.hh
-	$(CXX11) $(CXXFLAGS) -c -o $@ $<
+Currex_backend_wrap.cxx: Currex_backend.i
+	swig -perl -c++ -Wall $<
 
 pruner.o: pruner.cc pruner.hh d.hh algo.hh c-print.hh g-common.hh
-	$(CXX11) $(CXXFLAGS) -c -o $@ $<
-
-rates.o: rates.cc rates.hh http.hh
-	$(CXX11) $(CXXFLAGS) -c -o $@ $<
+	$(CXX11) $(L) $(CXXFLAGS) -c -o $@ $<
 
 graph.o: graph.cc graph.hh d.hh algo.hh c-print.hh g-common.hh g-color.hh g-rategraph.hh labeled.hh
-	$(CXX11) $(CXXFLAGS) -c -o $@ $<
+	$(CXX11) $(L) $(CXXFLAGS) -c -o $@ $<
 
 g-common.hh: util.hh
 
 g-rategraph.hh: c-print.hh
 
 %.o: %.cc %.hh
-	$(CXX11) $(CXXFLAGS) -c -o $@ $<
+	$(CXX11) $(L) $(CXXFLAGS) -c -o $@ $<
 
 %.hh:
 
 clean:
-	rm -f *.o *.gch core {pre,post}.dot run-{instr-ls,pruner,rates,graph,eval} main
+	rm -f *.o *.gch core {pre,post}.dot  *.pm *_wrap.cxx
