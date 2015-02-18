@@ -270,6 +270,7 @@ g_rategraph::Rated_path best_path(Labeled_graph const& lg_in, long max_iteration
 			break;
 		}
 	}
+	rp_out.path = g_common::close_path<Graph>(rp_out.path);
 	return rp_out;
 }
 

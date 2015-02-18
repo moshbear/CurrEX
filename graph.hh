@@ -70,6 +70,8 @@ namespace graph {
 	// Compute the best path, subject to an optional specified iteration limit.
 	//	0th iteration searches for initial 3-cycle and successive iterations build iteratively from that.
 	//
+	// Note: returns a closed path
+	//
 	// Arg: Labeled_graph const& lg_in - input graph
 	// Arg: size_t max_iterations - maximum iteration count
 	// Ret: best path subject to the iteration count constraint
